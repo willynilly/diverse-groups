@@ -1,0 +1,27 @@
+{
+  "name": "diverse-groups",
+  "version": "1.0.0",
+  "description": "A library that creates maximally diverse groups.",
+  "main": "index.js",
+  "scripts": {
+    "test": "istanbul cover -x \"spec/**\" -x \"index.js\" --include-all-sources jasmine"
+  },
+  "keywords": [
+    "groups",
+    "genetic",
+    "algorithm"
+  ],
+  "author": "Will Riley",
+  "license": "ISC",
+  "dependencies": {
+    "geneticalgorithm": "^0.3.4",
+    "javlin-pure": "0.0.1",
+    "lodash": "^4.17.4",
+    "ml-distance": "^2.1.1"
+  },
+  "devDependencies": {
+    "istanbul": "^0.4.5",
+    "jasmine": "^2.6.0",
+    "jasmine-spec-reporter": "^4.1.0"
+  }
+}

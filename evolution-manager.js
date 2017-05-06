@@ -5,9 +5,10 @@ const Group = require('./group');
 
 class EvolutionManager {
 
-	constructor(populationSize, groupSizes, featureCount, minFeatureValue, maxFeatureValue) {
+	constructor() {}
 
-		this.population = this.createPopulation(populationSize, groupSizes, featureCount, minFeatureValue, maxFeatureValue);
+	setPopulation(communities, maxCommunityCount) {
+		this.communities = communities;
 
 		let config = {
 
@@ -15,11 +16,20 @@ class EvolutionManager {
 			crossoverFunction: _.bind(this.crossover, this),
 			fitnessFunction: _.bind(this.fitness, this),
 			//doesABeatBFunction: doesABeatBFunction,
-			population: this.population,
-			populationSize: populationSize
+			population: communities,
+			populationSize: maxCommunityCount
 		}
 
 		this.ga = GA(config);
+	}
+
+	createRandomCommunities(communityCount, groupSizes, featureCount, minFeatureValue, maxFeatureValue) {
+		let communities = _.times(communityCount, () => {
+			let community = new Community();
+			community.addRandomGroups(groupSizes, featureCount, minFeatureValue, maxFeatureValue)
+			return community;
+		});
+		return communities;
 	}
 
 	evolve(generationCount, shouldPrintBest) {
@@ -127,15 +137,6 @@ class EvolutionManager {
 		return _.reduce(community.groups, (totalScore, group) => {
 			return totalScore + this.getScoreForGroup(group);
 		}, 0);
-	}
-
-	createPopulation(popSize, groupSizes, featureCount, minFeatureValue, maxFeatureValue) {
-		let communities = _.times(popSize, () => {
-			let community = new Community();
-			community.addRandomGroups(groupSizes, featureCount, minFeatureValue, maxFeatureValue)
-			return community;
-		});
-		return communities;
 	}
 }
 

@@ -8,15 +8,17 @@ describe('EvolutionManager', () => {
 
 	let em;
 	let communities;
-	let populationSize = 100;
+	let communityCount = 100;
+	let maxCommunityCount = 100;
 	let groupSizes = [2, 2, 5];
 	let featureCount = 2;
 	let minFeatureValue = 0;
 	let maxFeatureValue = 3;
 
 	beforeEach(() => {
-		em = new EvolutionManager(populationSize, groupSizes, featureCount, minFeatureValue, maxFeatureValue);
-		communities = em.population;
+		em = new EvolutionManager();
+		communities = em.createRandomCommunities(communityCount, groupSizes, featureCount, minFeatureValue, maxFeatureValue);
+		em.setPopulation(communities, maxCommunityCount);
 	})
 
 	describe('#mutate(communityJsonObject)', () => {

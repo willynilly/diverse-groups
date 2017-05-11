@@ -29,32 +29,97 @@ class Community {
 		}, []);
 	}
 
-	addRandomGroups(groupSizes, featureCount, minFeatureValue, maxFeatureValue) {
-		let groupsToAdd = _.map(groupSizes, (groupSize) => {
-			let group = new Group(featureCount, groupSize, groupSize);
-			group.addRandomIndividuals(groupSize, featureCount, minFeatureValue, maxFeatureValue);
-			return group;
+	addGroup(group) {
+		this.groups.push(group);
+	}
+
+	addGroups(groups) {
+		this.groups = _.concat(this.groups, groups);
+	}
+
+	removeAllGroups() {
+		this.groups = [];
+	}
+
+	removeAllIndividuals() {
+		let allIndividuals = this.getAllIndividuals();
+		_.forEach(this.groups, (group) => {
+			group.individuals = [];
 		});
-		this.groups = _.concat(this.groups, groupsToAdd);
+		return allIndividuals;
 	}
 
-	moveRandomIndividualBetweenTwoRandomGroups() {
-		if (this.groups.length > 1) {
-			let targetGroups = _.sampleSize(this.groups, 2);
-			let fromGroup = targetGroups[0];
-			let toGroup = targetGroups[1];
-			let otherIndividual = null;
-			if (!fromGroup.canAddIndividual()) {
-				otherIndividual = toGroup.removeRandomIndividual();
-			}
-			fromGroup.moveRandomIndividualToGroup(toGroup);
-			if (otherIndividual !== null) {
-				fromGroup.addIndividual(otherIndividual);
-			}
+	shuffleIndividualsAcrossGroups() {
+		let individuals = this.removeAllIndividuals();
+		let groups = this.addIndividualsToRandomGroups(individuals);
+		return groups;
+	}
+
+	addIndividualsToRandomGroups(individuals) {
+		let groups = [];
+		_.forEach(individuals, (individual) => {
+			groups.push(this.addIndividualToRandomGroup(individual));
+		})
+		return groups;
+	}
+
+	addIndividualToRandomGroup(individual) {
+		let groupsThatCanAddAnIndividual = _.filter(this.groups, (group) => {
+			return group.canAddIndividual();
+		});
+		if (groupsThatCanAddAnIndividual.length) {
+			let group = _.sample(groupsThatCanAddAnIndividual);
+			group.addIndividual(individual);
+			return group;
 		}
+		return null;
 	}
 
+	getGroupWithIndividual(individual) {
+		let index = _.findIndex(this.groups, (group) => {
+			return group.containsIndividual(individual);
+		});
+		if (index !== -1) {
+			return this.groups[index];
+		}
+		return false;
+	}
 
+	removeIndividual(individual) {
+		let fromGroup = this.getGroupWithIndividual(individual);
+		if (fromGroup !== null) {
+			return fromGroup.removeIndividual(individual);
+		}
+		return false;
+	}
+
+	moveRandomIndividualToAnotherRandomGroup(shouldSwapDisplacedIndividual) {
+		if (this.groups.length >= 2) {
+			let individual = _.sample(this.getAllIndividuals());
+			this.moveIndividualToAnotherRandomGroup(individual, shouldSwapDisplacedIndividual);
+		}
+		return false;
+	}
+
+	moveIndividualToAnotherRandomGroup(individual, shouldSwapDisplacedIndividual) {
+		if (individual !== null && this.groups.length >= 2) {
+			let fromGroup = this.getGroupWithIndividual(individual);
+			let overrideSizeConstraints = true;
+			fromGroup.removeIndividual(individual, overrideSizeConstraints);
+			let toGroup = _.sample(_.filter(this.groups, (group) => {
+				return group !== fromGroup;
+			}));
+			let displacedIndividual = toGroup.addIndividualOrSwapWithRandomIndividual(individual);
+			if (displacedIndividual !== true && displacedIndividual !== false) {
+				if (!shouldSwapDisplacedIndividual) {
+					return displacedIndividual;
+				}
+				fromGroup.addIndividual(displacedIndividual, overrideSizeConstraints);
+			}
+			return true;
+		}
+		return false;
+	}
 }
 
 module.exports = Community;

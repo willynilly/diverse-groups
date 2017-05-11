@@ -4,7 +4,8 @@ const Individual = require('./individual');
 
 class Group {
 
-	constructor(featureCount, minSize, maxSize) {
+	constructor(id, featureCount, minSize, maxSize) {
+		this.id = id;
 		this.featureCount = featureCount;
 		this.minSize = minSize;
 		this.maxSize = maxSize;
@@ -18,6 +19,7 @@ class Group {
 	}
 
 	fromJsonObject(jsonObject) {
+		this.id = jsonObject.id;
 		this.featureCount = jsonObject.featureCount;
 		this.minSize = jsonObject.minSize;
 		this.maxSize = jsonObject.maxSize;
@@ -29,7 +31,7 @@ class Group {
 	}
 
 	cloneEmpty() {
-		let group = new Group(this.featureCount, this.minSize, this.maxSize);
+		let group = new Group(this.id, this.featureCount, this.minSize, this.maxSize);
 		return group;
 	}
 
@@ -49,11 +51,14 @@ class Group {
 		return dGroup;
 	}
 
-	removeRandomSubGroup(individualCount) {
-		let subGroup = this.getRandomSubGroup(individualCount);
-		let dGroup = this.getDifferenceGroup(subGroup);
-		this.individuals = dGroup.individuals;
-		return subGroup;
+	removeRandomSubGroup(individualCount, overrideSizeConstraints) {
+		if (overrideSizeConstraints || individualCount <= this.getCanRemoveIndividualCount()) {
+			let subGroup = this.getRandomSubGroup(individualCount);
+			let dGroup = this.getDifferenceGroup(subGroup);
+			this.individuals = dGroup.individuals;
+			return subGroup;
+		}
+		return false;
 	}
 
 	getRandomSubGroup(individualCount) {
@@ -62,10 +67,12 @@ class Group {
 		return subGroup;
 	}
 
-	addGroup(group) {
-		if (group && group.individuals && group.individuals.length > 0) {
-			this.individuals = _.concat(this.individuals, group.individuals);
+	addGroup(group, overrideSizeConstraints) {
+		if (group && group.getIndividualCount() > 0 && (overrideSizeConstraints || group.individuals.length <= this.canAddIndividualCount())) {
+			this.addIndividuals(group.getIndividuals());
+			return true;
 		}
+		return false;
 	}
 
 	getCanAddIndividualCount() {
@@ -90,22 +97,16 @@ class Group {
 		return this.individuals.length < this.maxSize;
 	}
 
-	addRandomIndividuals(individualCount, featureCount, minValue, maxValue) {
-		this.individuals = _.times(individualCount, (i) => {
-			let individual = new Individual(i);
-			individual.randomize(featureCount, minValue, maxValue);
-			return individual;
-		});
-	}
-
-	moveRandomIndividualToGroup(toGroup) {
-		let individual = _.sample(this.individuals);
-		if (individual) {
-			_.remove(this.individuals, (v) => {
-				return v === individual;
-			});
-			toGroup.individuals.push(individual);
-		};
+	moveRandomIndividualToGroup(toGroup, overrideSizeConstraints) {
+		let individual = this.getRandomIndividual();
+		if (individual !== null) {
+			if (overrideSizeConstraints || (this.canRemoveIndividual() && toGroup.canAddIndividual())) {
+				this.removeIndividual(individual, overrideSizeConstraints);
+				toGroup.addIndividual(individual, overrideSizeConstraints);
+				return individual;
+			}
+		}
+		return false;
 	}
 
 	getSumIndividual() {
@@ -134,25 +135,95 @@ class Group {
 		return averageIndividual;
 	}
 
-	addIndividual(individual) {
-		this.individuals.push(individual);
+	addIndividual(individual, overrideSizeConstraints) {
+		if (overrideSizeConstraints || this.canAddIndividual()) {
+			this.individuals.push(individual);
+			return true;
+		}
+		return false;
+	}
+
+	addIndividuals(individuals, overrideSizeConstraints) {
+		if (overrideSizeConstraints || individuals.length <= this.getCanAddIndividualCount()) {
+			_.forEach(individuals, (individual) => {
+				this.addIndividual(individual, overrideSizeConstraints);
+			});
+			return true;
+		}
+		return false;
+	}
+
+	addIndividualOrSwapWithRandomIndividual(individual) {
+		if (this.canAddIndividual()) {
+			return this.addIndividual(individual);
+		} else {
+			return this.swapWithRandomIndividual(individual);
+		}
+	}
+
+	swapWithRandomIndividual(individual) {
+		if (individual !== null && this.individuals.length >= 1) {
+			let overrideSizeConstraints = true;
+			let removedIndividual = this.removeRandomIndividual(overrideSizeConstraints);
+			this.addIndividual(individual, overrideSizeConstraints);
+			return removedIndividual;
+		}
+		return false;
 	}
 
 	containsIndividual(individual) {
 		return this.individuals.indexOf(individual) !== -1;
 	}
 
-	removeRandomIndividual() {
-		if (this.individuals.length > 0) {
-			let individual = _.sample(this.individuals);
-			_.remove(this.individuals, (ind) => {
-				return ind === individual;
-			});
-			return individual;
-		}
-		return null;
+	getRandomIndividual() {
+		return _.sample(this.individuals);
 	}
 
+	removeAllIndividuals() {
+		this.individuals = [];
+		return true;
+	}
+
+	removeIndividuals(individuals, overrideSizeConstraints) {
+		let individualsToRemove = _.filter(individuals, (individual) => {
+			return this.containsIndividual(individual);
+		});
+		if (overrideSizeConstraints || individualsToRemove.length <= this.getCanRemoveIndividualCount()) {
+			_.forEach(individuals, (individual) => {
+				this.removeIndividual(individual, overrideSizeConstraints);
+			});
+			return true;
+		}
+		return false;
+	}
+
+	removeIndividual(individual, overrideSizeConstraints) {
+		if (this.containsIndividual(individual)) {
+			if (overrideSizeConstraints || this.canRemoveIndividual()) {
+				_.remove(this.individuals, (ind) => {
+					return ind === individual;
+				});
+				return true;
+			}
+		}
+		return false;
+	}
+
+	removeRandomIndividual(overrideSizeConstraints) {
+		let individual = this.getRandomIndividual();
+		if (this.removeIndividual(individual, overrideSizeConstraints) === true) {
+			return individual;
+		}
+		return false;
+	}
+
+	getIndividuals() {
+		return this.individuals;
+	}
+
+	getIndividualCount() {
+		return this.individuals.length;
+	}
 
 }
 

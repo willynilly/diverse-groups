@@ -7,18 +7,119 @@ let _ = require('lodash');
 describe('EvolutionManager', () => {
 
 	let em;
+	let individuals;
+	let groups;
 	let communities;
+
+	let individualCount = 100;
+	let groupCount = 3;
+	let minGroupSize = 2;
+	let maxGroupSize = 10;
 	let communityCount = 100;
 	let maxCommunityCount = 100;
-	let groupSizes = [2, 2, 5];
 	let featureCount = 2;
 	let minFeatureValue = 0;
 	let maxFeatureValue = 3;
 
 	beforeEach(() => {
 		em = new EvolutionManager();
-		communities = em.createRandomCommunities(communityCount, groupSizes, featureCount, minFeatureValue, maxFeatureValue);
+		individuals = em.createRandomIndividuals(individualCount, featureCount, minFeatureValue, maxFeatureValue);
+		groups = em.createRandomGroups(groupCount, featureCount, minGroupSize, maxGroupSize, individuals);
+		communities = em.createRandomCommunities(communityCount, groups);
 		em.setPopulation(communities, maxCommunityCount);
+	})
+
+	describe('#createRandomIndividuals(individualCount, featureCount, minFeatureValue, maxFeatureValue)', () => {
+		let individuals;
+
+		beforeEach(() => {
+			individuals = em.createRandomIndividuals(individualCount, featureCount, minFeatureValue, maxFeatureValue);
+		})
+
+		it('should return an array of individuals of size individualCount', () => {
+			expect(individuals.length).toEqual(individualCount);
+		})
+
+		it('should return an array of individuals, where each individual has an array of features of size featureCount', () => {
+			let hasWrongFeatureCount = _.some(individuals, (individual) => {
+				return !_.isArray(individual.features) || individual.features.length !== featureCount;
+			});
+			expect(hasWrongFeatureCount).toEqual(false);
+		})
+
+		it('should return an array of individuals, where each individual has an id equal to its index in the array', () => {
+			let hasWrongId = _.some(individuals, (individual, i) => {
+				return individual.id === (i + '');
+			});
+			expect(hasWrongId).toEqual(false);
+		})
+
+	})
+
+	describe('#createRandomEmptyGroups(groupCount, featureCount, minGroupSize, maxGroupSize)', () => {
+		let emptyGroups;
+
+		beforeEach(() => {
+			emptyGroups = em.createRandomEmptyGroups(groupCount, featureCount, minGroupSize, maxGroupSize);
+		})
+
+		it('should return an array of groups with groupCount groups', () => {
+			expect(emptyGroups.length).toEqual(groupCount);
+		})
+
+		it('should return an array of groups where each group has the specified featureCount', () => {
+			let hasWrongFeatureCount = _.some(emptyGroups, (group) => {
+				return group.featureCount !== featureCount;
+			});
+			expect(hasWrongFeatureCount).toEqual(false);
+		})
+
+		it('should return an array of groups where each group has a minGroupSize between minGroupSize and maxGroupSize inclusive', () => {
+			let hasWrongMinGroupSize = _.some(emptyGroups, (group) => {
+				return group.minSize < minGroupSize || group.minSize > maxGroupSize;
+			});
+			expect(hasWrongMinGroupSize).toEqual(false);
+		})
+
+		it('should return an array of groups where each group has a minGroupSize between minGroupSize and maxGroupSize inclusive', () => {
+			let hasWrongMaxGroupSize = _.some(emptyGroups, (group) => {
+				return group.maxSize < minGroupSize || group.maxSize > maxGroupSize;
+			});
+			expect(hasWrongMaxGroupSize).toEqual(false);
+		})
+
+		it('should return an array of groups where each group has an empty array of individuals', () => {
+			let hasWrongIndividualCount = _.some(emptyGroups, (group) => {
+				return !_.isArray(group.individuals) || group.individuals.length !== 0;
+			});
+			expect(hasWrongIndividualCount).toEqual(false);
+		})
+
+	})
+
+	describe('#randomlyAssignIndividualsToGroups(individuals, groups)', () => {
+
+		let groups;
+		let leftOverGroup;
+
+		beforeEach(() => {
+			groups = em.createRandomEmptyGroups(groupCount, featureCount, minGroupSize, maxGroupSize);
+			leftOverGroup = em.randomlyAssignIndividualsToGroups(individuals, groups);
+		})
+
+		it('should return a group containing leftover individuals that has a minSize of 0', () => {
+			expect(leftOverGroup.minSize).toEqual(0);
+		})
+
+		it('should return a group containing leftover individuals that has a maxSize equal to the sum of the individuals in the groups plus the length of the input individuals', () => {
+			groups = em.createRandomEmptyGroups(groupCount, featureCount, minGroupSize, maxGroupSize);
+			let individual = em.createRandomIndividuals(1, featureCount, minFeatureValue, maxFeatureValue);
+			groups[0].addIndividual(individual);
+			leftOverGroup = em.randomlyAssignIndividualsToGroups(individuals, groups);
+
+			let expectedMaxSize = individuals.length + 1;
+			expect(leftOverGroup.maxSize).toEqual(expectedMaxSize);
+		})
 	})
 
 	describe('#mutate(communityJsonObject)', () => {
@@ -26,16 +127,17 @@ describe('EvolutionManager', () => {
 			let communityA = communities[0];
 			let resultCommunity = em.mutate(communityA);
 			let individualCount = resultCommunity.getAllIndividuals().length;
-			let expectedIndividualCount = _.sum(groupSizes);
+			let expectedIndividualCount = individualCount;
 			expect(individualCount).toEqual(expectedIndividualCount)
 		})
 
 		it('should return a community with the same number of groups', () => {
+			let expectedGroupCount = groupCount + 1;
 			let communityA = communities[0];
+			expect(communityA.groups.length).toEqual(expectedGroupCount);
 			let resultCommunity = em.mutate(communityA);
-			let groupCount = resultCommunity.groups.length;
-			let expectedGroupCount = groupSizes.length;
-			expect(groupCount).toEqual(expectedGroupCount)
+			let resultGroupCount = resultCommunity.groups.length;
+			expect(resultGroupCount).toEqual(expectedGroupCount)
 		})
 
 
@@ -57,20 +159,22 @@ describe('EvolutionManager', () => {
 
 		it('should return two communities with the same number of individuals', () => {
 			let resultCommunities = em.crossover(communityA, communityB);
-			let expectedIndividualCount = _.sum(groupSizes);
+			let expectedIndividualCount = individualCount;
 			let individualCountA = resultCommunities[0].getAllIndividuals().length;
 			let individualCountB = resultCommunities[1].getAllIndividuals().length;
 			expect(individualCountA).toEqual(expectedIndividualCount);
 			expect(individualCountB).toEqual(expectedIndividualCount);
 		})
 
-		it('should return two communities with the same number of groups', () => {
+		it('should return two communities with the same number of groups as in communityA and communityB', () => {
+			let expectedGroupCount = groupCount + 1;
+			expect(communityA.groups.length).toEqual(expectedGroupCount)
+			expect(communityB.groups.length).toEqual(expectedGroupCount);
 			let resultCommunities = em.crossover(communityA, communityB);
-			let expectedGroupCount = groupSizes.length;
-			let individualCountA = resultCommunities[0].groups.length;
-			let individualCountB = resultCommunities[1].groups.length;
-			expect(individualCountA).toEqual(expectedGroupCount);
-			expect(individualCountB).toEqual(expectedGroupCount);
+			let groupCountA = resultCommunities[0].groups.length;
+			let groupCountB = resultCommunities[1].groups.length;
+			expect(groupCountA).toEqual(expectedGroupCount);
+			expect(groupCountB).toEqual(expectedGroupCount);
 		})
 
 		it('should return an array with two communities', () => {
@@ -81,7 +185,7 @@ describe('EvolutionManager', () => {
 
 	describe('#crossoverGroup(groupA, groupB, leftOverGroup)', () => {
 		it('should return a group that has the intersection of groupA and groupB', () => {
-			let leftOverGroup = new Group(3, 1, 1);
+			let leftOverGroup = new Group('left', 3, 1, 1);
 			let individual5 = new Individual('5', [5, 5, 5]);
 			leftOverGroup.addIndividual(individual5);
 
@@ -92,12 +196,12 @@ describe('EvolutionManager', () => {
 			let sharedIndividual1 = new Individual('1', [1, 1, 1]);
 			let sharedIndividual6 = new Individual('6', [6, 6, 6]);
 
-			let groupA = new Group(3, 3, 3);
+			let groupA = new Group('a', 3, 3, 3);
 			groupA.addIndividual(individual0)
 			groupA.addIndividual(sharedIndividual1);
 			groupA.addIndividual(sharedIndividual6);
 
-			let groupB = new Group(3, 4, 4);
+			let groupB = new Group('b', 3, 4, 4);
 			groupB.addIndividual(individual3)
 			groupB.addIndividual(individual2)
 			groupB.addIndividual(sharedIndividual1);

@@ -1,16 +1,37 @@
 let _ = require('lodash');
 let Group = require('../group');
 let Individual = require('../individual');
+let IndividualFactory = require('../individual-factory');
 
 describe('Group', () => {
 
 	let group;
+	let id = 'somegroup';
 	let featureCount = 10;
 	let minGroupSize = 3;
 	let maxGroupSize = 6;
+	let individualFactory = new IndividualFactory();
 
 	beforeEach(() => {
-		group = new Group(featureCount, minGroupSize, maxGroupSize);
+		group = new Group(id, featureCount, minGroupSize, maxGroupSize);
+	})
+
+	describe('#Group(id, featureCount, minGroupSize, maxGroupSize)', () => {
+		it('should set the name', () => {
+			expect(group.id).toEqual(id);
+		});
+
+		it('should set the featureCount', () => {
+			expect(group.featureCount).toEqual(featureCount);
+		});
+
+		it('should set the minGroupSize', () => {
+			expect(group.minSize).toEqual(minGroupSize);
+		});
+
+		it('should set the maxGroupSize', () => {
+			expect(group.maxSize).toEqual(maxGroupSize);
+		});
 	})
 
 	describe('#canRemoveIndividual()', () => {
@@ -73,6 +94,44 @@ describe('Group', () => {
 				return v !== 0;
 			});
 			expect(outliers.length).toEqual(0);
+		})
+
+	})
+
+	describe('#addIndividuals(individuals, overrideSizeConstraints)', () => {
+
+		let individuals;
+
+		beforeEach(() => {
+			individuals = individualFactory.getIndividualsByRange(featureCount, 3, 4);
+		})
+
+		it('should return true and add individuals WHEN overrideSizeConstraints is true', () => {
+			let overrideSizeConstraints = true;
+			expect(group.getIndividualCount()).toEqual(0);
+			let result = group.addIndividuals(individuals, overrideSizeConstraints);
+			expect(result).toEqual(true);
+			expect(group.getIndividualCount()).toEqual(individuals.length);
+		})
+
+	})
+
+	describe('#addIndividual(individual, overrideSizeConstraints)', () => {
+
+		let individuals;
+		let individual;
+
+		beforeEach(() => {
+			individuals = individualFactory.getIndividualsByRange(featureCount, 3, 4);
+			individual = individuals[0];
+		})
+
+		it('should return true and add individual WHEN overrideSizeConstraints is true', () => {
+			let overrideSizeConstraints = true;
+			expect(group.getIndividualCount()).toEqual(0);
+			let result = group.addIndividual(individual, overrideSizeConstraints);
+			expect(result).toEqual(true);
+			expect(group.getIndividualCount()).toEqual(1);
 		})
 
 	})
